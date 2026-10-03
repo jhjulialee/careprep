@@ -1,25 +1,40 @@
 # CarePrep
 
-CarePrep is a full-stack appointment-preparation planner. Authenticated users create private appointments and maintain prioritized question lists for each visit. It is an educational project that uses **fictional demonstration data only**; do not enter real or sensitive medical information.
+CarePrep is a full-stack appointment-preparation planner. Authenticated users create private appointments and maintain prioritized question lists for each visit.
+
+This is an educational project that uses **fictional demonstration data only**. Do not enter real or sensitive medical information. CarePrep is an organizational tool; it does not diagnose conditions, recommend treatment, or connect to real medical records.
 
 ## Project goals
 
-CarePrep turns scattered notes and reminders into a focused preparation workflow. It demonstrates session authentication, object-level authorization, relational data modeling, RESTful CRUD, a responsive React interface, validation, and automated backend tests.
+CarePrep turns scattered notes and reminders into a focused preparation workflow. It demonstrates:
+
+- Session-based authentication with Flask-Login.
+- Object-level authorization so users access only their own records.
+- Relational data modeling with User, Appointment, and Question resources.
+- RESTful CRUD operations for appointments and appointment questions.
+- A responsive React interface with protected routes and auth-state restoration.
+- Frontend and backend validation, error states, and automated backend tests.
 
 ## Features
 
 - Register, log in, restore a session after refresh, and log out using Flask-Login sessions.
+- Password hashing with Werkzeug using PBKDF2 for local macOS compatibility.
 - Create, view, edit, and delete private appointments.
-- Add, edit, prioritize (1–3), mark discussed, and delete questions for each appointment.
+- Add, prioritize from 1–3, mark discussed, and delete questions for an appointment.
 - Enforce server-side ownership on every appointment and question endpoint.
-- Use protected client routes, conditional navigation, loading, empty, validation, error, and confirmation states.
+- Use protected React routes and conditional navigation.
+- Display loading, empty, validation, error, and deletion-confirmation states.
 - Serve the production React build from Flask when `client/dist` exists.
 
 ## Architecture
 
-`User 1 → many Appointment 1 → many Question`
+```text
+User
+  └── has many Appointments
+         └── has many Questions
+```
 
-A Question is authorized through its parent Appointment. The browser never submits a trusted user ID; Flask derives identity from the authenticated session.
+A Question is authorized through its parent Appointment. The browser never submits a trusted user ID; Flask derives identity from the authenticated session and verifies ownership server-side.
 
 ## Tech stack
 
@@ -29,92 +44,200 @@ A Question is authorized through its parent Appointment. The browser never submi
 | Backend | Python, Flask, Flask-Login, Flask-SQLAlchemy, Werkzeug |
 | Database | SQLite locally; configurable with `DATABASE_URI` |
 | Testing | Pytest |
+| Quality checks | ESLint and Vite production build |
 | Deployment | Gunicorn-ready; Flask production-build fallback |
 
 ## Local setup
 
-### 1. Backend
+### Prerequisites
+
+Install:
+
+- Python 3
+- Node.js and npm
+- Git
+
+### 1. Clone the repository
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+git clone [https://github.com/jhjulialee/careprep.git](https://github.com/jhjulialee/careprep.git)
+cd careprep
+```
+
+### 2. Configure the backend
+
+Create and activate a Python virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install backend dependencies:
+
+```bash
 pip install -r requirements.txt
-cp .env.example .env            # Windows PowerShell: Copy-Item .env.example .env
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Initialize the SQLite database and add fictional demo data:
+
+```bash
 flask --app server.app init-db
+flask --app server.app seed
+```
+
+Start Flask:
+
+```bash
 flask --app server.app run --port 5555 --debug
 ```
 
-### 2. Frontend
+The backend runs at:
+
+```text
+http://127.0.0.1:5555
+```
+
+### 3. Configure the frontend
 
 In a second terminal:
 
 ```bash
-cd client
+cd careprep/client
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite proxies `/api` requests to Flask on port 5555.
+Open the URL printed by Vite, normally:
+
+```text
+http://localhost:5173
+```
+
+Vite proxies `/api` requests to Flask on port 5555.
 
 ### Demo account
 
-Seed optional fictional data with:
+After running the seed command, sign in with this fictional demo account:
 
-```bash
-flask --app server.app seed
+```text
+Email: demo@careprep.test
+Password: careprep123
 ```
 
-Then sign in with `demo@careprep.test` / `careprep123`.
+## Tests and quality checks
 
-## Tests and checks
+From the project root, activate the virtual environment and run backend tests:
 
 ```bash
+source .venv/bin/activate
 PYTHONPATH=. pytest -q
+```
+
+Expected result:
+
+```text
+5 passed
+```
+
+Run frontend linting and the production build:
+
+```bash
 cd client
 npm run lint
 npm run build
 ```
 
+The project should complete both commands without lint errors or build errors.
+
+### Test coverage
+
+The backend test suite verifies:
+
+- Registration, login, authenticated-session restoration, and logout behavior.
+- Appointment creation, update, and deletion.
+- Question creation, discussed-status updates, and deletion.
+- Validation errors for invalid registration and appointment data.
+- Unauthenticated requests receive `401` responses from protected appointment routes.
+- Cross-user isolation: a second authenticated user receives a `404` response when attempting to access another user’s appointment.
+
+## Demo walkthrough
+
+1. Register a fictional user account or sign in with the seeded demo account.
+2. Create an appointment with fictional provider, date, location, and preparation notes.
+3. Add questions, assign priorities from 1–3, and mark a question as discussed.
+4. Edit and delete records to demonstrate complete CRUD functionality.
+5. Refresh the browser to verify that the authenticated session is restored.
+6. Log out, create a second test account, and verify it cannot access the first account’s appointment URL.
+7. Visit `/appointments` while logged out and verify that the React protected route redirects to login.
+
 ## API routes
 
 | Method | Endpoint | Access and purpose |
 |---|---|---|
-| POST | `/api/auth/register` | Public; create account and authenticated session |
-| POST | `/api/auth/login` | Public; verify credentials and start session |
-| GET | `/api/auth/me` | Authenticated; restore current user |
-| DELETE | `/api/auth/logout` | Authenticated; end session |
-| GET/POST | `/api/appointments` | List or create current user’s appointments |
-| GET/PATCH/DELETE | `/api/appointments/:id` | Owner-only appointment operations |
-| POST | `/api/appointments/:id/questions` | Add a question to an owned appointment |
-| PATCH/DELETE | `/api/questions/:id` | Owner-only question operations |
+| POST | `/api/auth/register` | Public; create an account and authenticated session |
+| POST | `/api/auth/login` | Public; verify credentials and start a session |
+| GET | `/api/auth/me` | Authenticated; restore the current user |
+| DELETE | `/api/auth/logout` | Authenticated; end the active session |
+| GET | `/api/appointments` | Authenticated; list the current user’s appointments |
+| POST | `/api/appointments` | Authenticated; create an appointment for the current user |
+| GET | `/api/appointments/:id` | Owner-only; retrieve one appointment and its questions |
+| PATCH | `/api/appointments/:id` | Owner-only; update one appointment |
+| DELETE | `/api/appointments/:id` | Owner-only; delete one appointment and its questions |
+| POST | `/api/appointments/:id/questions` | Owner-only; add a question to an owned appointment |
+| PATCH | `/api/questions/:id` | Owner-only; update question text, priority, or discussed status |
+| DELETE | `/api/questions/:id` | Owner-only; delete a question |
 
 ## Environment variables
 
-- `SECRET_KEY`: long, unpredictable key used to sign sessions.
-- `DATABASE_URI`: SQLAlchemy database URL; defaults to a local SQLite file.
-- `FLASK_ENV=production`: enables secure cookies for HTTPS deployment.
+Create `.env` from `.env.example`. Never commit `.env`.
 
-Never commit `.env`, real health information, or a production database file.
+| Variable | Purpose |
+|---|---|
+| `SECRET_KEY` | Long, unpredictable key used to sign Flask sessions |
+| `DATABASE_URI` | SQLAlchemy database URL; defaults to local SQLite |
+| `FLASK_ENV` | Set to `production` when deploying over HTTPS so session cookies are secure |
+
+## Security and privacy notes
+
+- Every protected API operation verifies `current_user` server-side.
+- Appointment queries are filtered by the logged-in user’s ID.
+- Question ownership is checked through the parent appointment.
+- Cross-user and nonexistent records return `404`, helping avoid unnecessary data disclosure.
+- Passwords are hashed with Werkzeug and never returned in API JSON.
+- Invalid client input returns clear `400` responses.
+- Unauthenticated protected requests return `401`.
+- Only fictional demonstration content should be used.
 
 ## Production build
 
+Build the React application:
+
 ```bash
-cd client && npm install && npm run build
+cd client
+npm install
+npm run build
 cd ..
+```
+
+When `client/dist` exists, Flask serves the React build and returns `index.html` for React client-side routes.
+
+For a production server, initialize the database and run Gunicorn:
+
+```bash
 flask --app server.app init-db
 gunicorn server.app:app
 ```
 
-When `client/dist` exists, Flask serves it and returns `index.html` for React client-side routes.
-
-## Quality and security notes
-
-- Every protected API operation verifies `current_user` server-side.
-- Nonexistent and cross-user records return `404`, avoiding data disclosure.
-- Passwords are hashed with Werkzeug and never returned in API JSON.
-- Input validation uses clear `400` errors; unauthenticated requests receive `401`.
-- SQLite is appropriate for a local demonstration. A multi-instance production deployment should use PostgreSQL, migrations, HTTPS, a strong secret, and secure operational controls.
-
 ## Known limitations and future work
 
-Deployment is not configured for a specific host. Future improvements include password reset/email verification, reminders, calendar integration, PostgreSQL deployment, pagination, filtering, frontend tests, accessibility audits, and an undo workflow for destructive actions.
+- Deployment is not configured for a specific host.
+- Local SQLite is appropriate for a demonstration but not for multi-instance production hosting.
+- The app uses browser confirmation dialogs for destructive actions; an undo workflow would improve the experience.
+- Future improvements may include PostgreSQL deployment, Flask-Migrate migrations, password reset, email verification, reminders, calendar integration, filtering, pagination, frontend test coverage, accessibility audits, and additional deployment configuration.
