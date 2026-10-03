@@ -1,4 +1,11 @@
-import { StrictMode, createContext, useContext, useEffect, useState } from 'react'
+import {
+  StrictMode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   BrowserRouter,
@@ -19,9 +26,12 @@ const api = async (url, options = {}) => {
     ...options,
   })
 
-  if (response.status === 204) return null
+  if (response.status === 204) {
+    return null
+  }
 
-  const data = await response.json()
+  const text = await response.text()
+  const data = text ? JSON.parse(text) : {}
 
   if (!response.ok) {
     throw new Error(data.error || 'Something went wrong.')
@@ -195,7 +205,7 @@ function Appointments() {
   const [state, setState] = useState('loading')
   const [error, setError] = useState('')
 
-  const load = () => {
+  const load = useCallback(() => {
     setState('loading')
     setError('')
 
@@ -208,11 +218,11 @@ function Appointments() {
         setError(requestError.message)
         setState('error')
       })
-  }
+  }, [])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   if (state === 'loading') {
     return (
@@ -396,17 +406,17 @@ function Detail() {
   const [question, setQuestion] = useState('')
   const [priority, setPriority] = useState(2)
 
-  const load = () => {
+  const load = useCallback(() => {
     setError('')
 
     api(`/api/appointments/${id}`)
       .then((data) => setAppointment(data.appointment))
       .catch((requestError) => setError(requestError.message))
-  }
+  }, [id])
 
   useEffect(() => {
     load()
-  }, [id])
+  }, [load])
 
   if (error) {
     return (
